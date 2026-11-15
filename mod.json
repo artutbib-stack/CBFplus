@@ -1,16 +1,16 @@
 {
-	"geode": "{{ geode }}",
+	"geode": "v3.0.0",
 	"gd": {
 		"win": "2.2081",
 		"android": "2.2081",
 		"mac": "2.2081",
 		"ios": "2.2081"
 	},
-	"id": "{{ id }}",
-	"name": "{{ name }}",
-	"version": "{{ version }}",
-	"developer": "{{ developer }}",
-	"description": "{{ description }}",
+	"id": "artutbib.cbfplus",
+	"name": "CBFPlus",
+	"version": "v1.0.0",
+	"developer": "Artur Kolbinov",
+	"description": "An enhanced CBF mod for Geometry Dash",
 	"dependencies": {
 		"geode.node-ids": ">=v1.23.3"
 	}
