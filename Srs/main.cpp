@@ -1,6 +1,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/ui/Popup.hpp>
 #include <Geode/ui/TextInput.hpp>
 #include <algorithm>
@@ -15,8 +16,6 @@ struct ModState {
     bool physicallyHeld = false;
     bool isBufferedHold = false;
 
-    CCPoint buttonPos = { 45.0f, 160.0f };
-
     void resetInput() {
         remainingCbfTicks = 0;
         physicallyHeld = false;
@@ -25,6 +24,7 @@ struct ModState {
 };
 
 static ModState g_state;
+static bool g_menuOpen = false;
 
 class CBFSettingsPopup : public geode::Popup {
 protected:
@@ -92,6 +92,7 @@ protected:
     bool init() override {
         if (!Popup::init(305.f, 145.f)) return false;
 
+        g_menuOpen = true;
         this->setTitle("Input Buffer");
         auto winSize = m_mainLayer->getContentSize();
         auto menu = CCMenu::create();
@@ -127,6 +128,11 @@ protected:
         return true;
     }
 
+    void onExit() override {
+        g_menuOpen = false;
+        Popup::onExit();
+    }
+
 public:
     static MainModMenuPopup* create() {
         auto ret = new MainModMenuPopup();
@@ -139,80 +145,17 @@ public:
     }
 };
 
-class DraggableCBFButton : public CCLayer {
-protected:
-    CCNode* m_visualBtn = nullptr;
-    bool m_isDragging = false;
-    bool m_hasMoved = false;
-    CCPoint m_touchStartPos;
-    CCPoint m_btnStartPos;
-
-    bool init() override {
-        if (!CCLayer::init()) return false;
-
-        this->setTouchEnabled(true);
-        this->setTouchMode(kCCTouchesOneByOne);
-        this->setTouchPriority(-500);
-
-        auto bg = CCScale9Sprite::create("GJ_button_01.png");
-        bg->setContentSize({ 46.f, 26.f });
-
-        auto lbl = CCLabelBMFont::create("BUF", "bigFont.fnt");
-        lbl->setScale(0.46f);
-        lbl->setPosition(bg->getContentSize() / 2);
-        bg->addChild(lbl);
-
-        m_visualBtn = bg;
-        m_visualBtn->setPosition(g_state.buttonPos);
-        this->addChild(m_visualBtn);
-
-        return true;
-    }
-
-    bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
-        auto pos = touch->getLocation();
-        if (m_visualBtn && m_visualBtn->boundingBox().containsPoint(this->convertToNodeSpace(pos))) {
-            m_isDragging = true;
-            m_hasMoved = false;
-            m_touchStartPos = pos;
-            m_btnStartPos = m_visualBtn->getPosition();
+class $modify(CBFKeyboardDispatcher, CCKeyboardDispatcher) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat) {
+        if (down && !isRepeat && key == KEY_F && this->getControlKeyPressed()) {
+            if (!g_menuOpen) {
+                if (auto popup = MainModMenuPopup::create()) {
+                    popup->show();
+                }
+            }
             return true;
         }
-        return false;
-    }
-
-    void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
-        if (!m_isDragging || !m_visualBtn) return;
-        auto pos = touch->getLocation();
-        auto diff = pos - m_touchStartPos;
-        if (diff.getLength() > 5.0f) {
-            m_hasMoved = true;
-        }
-        auto newPos = m_btnStartPos + diff;
-        auto winSize = CCDirector::sharedDirector()->getWinSize();
-        newPos.x = std::clamp(newPos.x, 25.f, winSize.width - 25.f);
-        newPos.y = std::clamp(newPos.y, 25.f, winSize.height - 25.f);
-
-        m_visualBtn->setPosition(newPos);
-        g_state.buttonPos = newPos;
-    }
-
-    void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
-        if (m_isDragging && !m_hasMoved) {
-            MainModMenuPopup::create()->show();
-        }
-        m_isDragging = false;
-    }
-
-public:
-    static DraggableCBFButton* create() {
-        auto ret = new DraggableCBFButton();
-        if (ret->init()) {
-            ret->autorelease();
-            return ret;
-        }
-        delete ret;
-        return nullptr;
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat);
     }
 };
 
@@ -221,13 +164,6 @@ class $modify(CBFPlayLayer, PlayLayer) {
         if (!PlayLayer::init(level, useReplay, dontSave)) {
             return false;
         }
-
-        if (auto hud = this->getChildByID("ui-layer")) {
-            hud->addChild(DraggableCBFButton::create(), 100);
-        } else {
-            this->addChild(DraggableCBFButton::create(), 100);
-        }
-
         g_state.resetInput();
         return true;
     }
