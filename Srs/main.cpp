@@ -26,11 +26,13 @@ struct ModState {
 
 static ModState g_state;
 
-class CBFSettingsPopup : public geode::Popup<> {
+class CBFSettingsPopup : public geode::Popup {
 protected:
     TextInput* m_tickInput = nullptr;
 
-    bool setup() override {
+    bool init() override {
+        if (!Popup::init(265.f, 165.f)) return false;
+
         this->setTitle("Input Buffer Settings");
         auto winSize = m_mainLayer->getContentSize();
 
@@ -74,7 +76,7 @@ protected:
 public:
     static CBFSettingsPopup* create() {
         auto ret = new CBFSettingsPopup();
-        if (ret->initAnchored(265.f, 165.f)) {
+        if (ret->init()) {
             ret->autorelease();
             return ret;
         }
@@ -83,11 +85,13 @@ public:
     }
 };
 
-class MainModMenuPopup : public geode::Popup<> {
+class MainModMenuPopup : public geode::Popup {
 protected:
     CCMenuItemToggler* m_cbfToggle = nullptr;
 
-    bool setup() override {
+    bool init() override {
+        if (!Popup::init(305.f, 145.f)) return false;
+
         this->setTitle("Input Buffer");
         auto winSize = m_mainLayer->getContentSize();
         auto menu = CCMenu::create();
@@ -126,7 +130,7 @@ protected:
 public:
     static MainModMenuPopup* create() {
         auto ret = new MainModMenuPopup();
-        if (ret->initAnchored(305.f, 145.f)) {
+        if (ret->init()) {
             ret->autorelease();
             return ret;
         }
