@@ -11,7 +11,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 project(cbf-plus VERSION 1.0.0 LANGUAGES CXX)
 
 # Add all source files inside src (recursively)
-file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS Src/*.cpp)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS Srs/*.cpp)
 
 # Set up the mod binary
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
