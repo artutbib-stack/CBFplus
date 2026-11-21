@@ -49,7 +49,6 @@ static void playBufferTriggerSound() {
     auto engine = FMODAudioEngine::sharedEngine();
     if (!engine) return;
 
-    // Пробуем стандартные звуки интерфейса GD по очереди для надёжности на разных сборках
     engine->playEffect("achievement_01.ogg");
 }
 
@@ -59,9 +58,7 @@ static bool canExecuteBufferedPress(PlayerObject* player) {
            player->m_isShip ||
            player->m_isBird ||
            player->m_isDart ||
-           player->m_isSwing ||
-           player->m_canRobotJump ||
-           player->m_canSpiderJump;
+           player->m_isSwing;
 }
 
 class MainModMenuPopup;
@@ -142,7 +139,6 @@ protected:
         menu->setPosition({ 0.f, 0.f });
         m_mainLayer->addChild(menu);
 
-        // 1. Включение / выключение инпут-буфера
         m_enableToggle = CCMenuItemExt::createTogglerWithStandardSprites(0.75f, [this](CCMenuItemToggler* sender) {
             bool nextEnabled = !sender->isToggled();
             g_state.enabled = nextEnabled;
@@ -164,16 +160,13 @@ protected:
         ticksBtn->setPosition({ 70.f, winSize.height / 2 + 28.f });
         menu->addChild(ticksBtn);
 
-        auto hintSpr = CCLabelBMFont::create(
-            fmt::format("[Window: {} ticks - Tap text to edit]", g_state.bufferTicks),
-            "goldFont.fnt"
-        );
+        auto hintText = fmt::format("[Window: {} ticks - Tap text to edit]", g_state.bufferTicks);
+        auto hintSpr = CCLabelBMFont::create(hintText.c_str(), "goldFont.fnt");
         hintSpr->setScale(0.28f);
         hintSpr->setAnchorPoint({ 0.0f, 0.5f });
         hintSpr->setPosition({ 70.f, winSize.height / 2 + 11.f });
         m_mainLayer->addChild(hintSpr);
 
-        // 2. Галочка звука при срабатывании забуференного нажатия
         m_soundToggle = CCMenuItemExt::createTogglerWithStandardSprites(0.75f, [](CCMenuItemToggler* sender) {
             bool nextSound = !sender->isToggled();
             g_state.soundEnabled = nextSound;
