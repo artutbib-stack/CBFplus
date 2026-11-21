@@ -104,13 +104,13 @@ protected:
         m_mainLayer->addChild(menu);
 
         m_cbfToggle = CCMenuItemExt::createTogglerWithStandardSprites(0.8f, [this](CCMenuItemToggler* sender) {
-            g_state.cbfEnabled = !sender->isToggled();
-            Mod::get()->setSavedValue<bool>("cbf-enabled", g_state.cbfEnabled);
-            if (!g_state.cbfEnabled) {
+            g_state.enabled = !sender->isToggled();
+            Mod::get()->setSavedValue<bool>("cbf-enabled", g_state.enabled);
+            if (!g_state.enabled) {
                 g_state.reset();
             }
         });
-        m_cbfToggle->toggle(g_state.cbfEnabled);
+        m_cbfToggle->toggle(g_state.enabled);
         m_cbfToggle->setPosition({ 48.f, winSize.height / 2 + 6.f });
         menu->addChild(m_cbfToggle);
 
@@ -180,7 +180,7 @@ class $modify(CBFPlayLayer, PlayLayer) {
 
 class $modify(CBFPlayerObject, PlayerObject) {
     void pushButton(PlayerButton btn) {
-        if (g_state.cbfEnabled && btn == PlayerButton::Jump && g_state.bufferTicks > 0) {
+        if (g_state.enabled && btn == PlayerButton::Jump && g_state.bufferTicks > 0) {
             if (!canPlayerBufferJump(this)) {
                 g_state.awaitingBufferedJump = true;
                 g_state.bufferedTicksLeft = g_state.bufferTicks;
@@ -202,7 +202,7 @@ class $modify(CBFPlayerObject, PlayerObject) {
     void update(float dt) {
         PlayerObject::update(dt);
 
-        if (!g_state.cbfEnabled || !g_state.awaitingBufferedJump) return;
+        if (!g_state.enabled || !g_state.awaitingBufferedJump) return;
         if (this->m_isDead) {
             g_state.reset();
             return;
@@ -226,6 +226,6 @@ class $modify(CBFPlayerObject, PlayerObject) {
 };
 
 $on_mod(Loaded) {
-    g_state.cbfEnabled = Mod::get()->getSavedValue<bool>("cbf-enabled", true);
+    g_state.enabled = Mod::get()->getSavedValue<bool>("cbf-enabled", true);
     g_state.bufferTicks = static_cast<int>(Mod::get()->getSavedValue<int64_t>("cbf-ticks", 10));
 };
