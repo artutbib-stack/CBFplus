@@ -146,7 +146,7 @@ public:
 };
 
 class $modify(CBFKeyboardDispatcher, CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool isRepeat, double timestamp) {
         if (down && !isRepeat && key == KEY_F && this->getControlKeyPressed()) {
             if (!g_menuOpen) {
                 if (auto popup = MainModMenuPopup::create()) {
@@ -155,7 +155,7 @@ class $modify(CBFKeyboardDispatcher, CCKeyboardDispatcher) {
             }
             return true;
         }
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat);
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, isRepeat, timestamp);
     }
 };
 
