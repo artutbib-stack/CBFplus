@@ -5,26 +5,30 @@
 #include <Geode/ui/Popup.hpp>
 #include <Geode/ui/TextInput.hpp>
 #include <algorithm>
+#include <string>
 
 using namespace geode::prelude;
 
-struct ModState {
-    bool cbfEnabled = true;
-    int bufferTicks = 4;
+struct InputBufferState {
+    bool enabled = true;
+    int bufferTicks = 10;
 
-    int remainingCbfTicks = 0;
-    bool physicallyHeld = false;
-    bool isBufferedHold = false;
+    int bufferedTicksLeft = 0;
+    bool awaitingBufferedJump = false;
 
-    void resetInput() {
-        remainingCbfTicks = 0;
-        physicallyHeld = false;
-        isBufferedHold = false;
+    void reset() {
+        bufferedTicksLeft = 0;
+        awaitingBufferedJump = false;
     }
 };
 
-static ModState g_state;
+static InputBufferState g_state;
 static bool g_menuOpen = false;
+
+static bool canPlayerBufferJump(PlayerObject* player) {
+    if (!player || player->m_isDead) return false;
+    return player->m_isOnGround || player->m_isShip || player->m_isBird || player->m_isDart || player->m_isSwing;
+}
 
 class CBFSettingsPopup : public geode::Popup {
 protected:
@@ -36,13 +40,13 @@ protected:
         this->setTitle("Input Buffer Settings");
         auto winSize = m_mainLayer->getContentSize();
 
-        auto desc = CCLabelBMFont::create("Input Buffer Window (1 - 100 ticks):", "bigFont.fnt");
+        auto desc = CCLabelBMFont::create("Max Early Ticks (0 - 100):", "bigFont.fnt");
         desc->setScale(0.38f);
         desc->setPosition({ winSize.width / 2, winSize.height / 2 + 28.f });
         m_mainLayer->addChild(desc);
 
-        auto subDesc = CCLabelBMFont::create("(240 TPS physics: 4 ticks = ~16.6ms)", "goldFont.fnt");
-        subDesc->setScale(0.32f);
+        auto subDesc = CCLabelBMFont::create("Only triggers if press is within N ticks", "goldFont.fnt");
+        subDesc->setScale(0.30f);
         subDesc->setPosition({ winSize.width / 2, winSize.height / 2 + 12.f });
         m_mainLayer->addChild(subDesc);
 
@@ -55,8 +59,8 @@ protected:
 
         auto saveBtnSpr = ButtonSprite::create("Apply", "goldFont.fnt", "GJ_button_01.png", 0.8f);
         auto saveBtn = CCMenuItemExt::createSpriteExtra(saveBtnSpr, [this](CCObject*) {
-            int parsed = geode::utils::numFromString<int>(m_tickInput->getString()).unwrapOr(4);
-            g_state.bufferTicks = std::clamp(parsed, 1, 100);
+            int parsed = geode::utils::numFromString<int>(m_tickInput->getString()).unwrapOr(10);
+            g_state.bufferTicks = std::clamp(parsed, 0, 100);
             Mod::get()->setSavedValue<int64_t>("cbf-ticks", g_state.bufferTicks);
             Notification::create(
                 fmt::format("Input Buffer: {} ticks", g_state.bufferTicks),
@@ -103,7 +107,7 @@ protected:
             g_state.cbfEnabled = !sender->isToggled();
             Mod::get()->setSavedValue<bool>("cbf-enabled", g_state.cbfEnabled);
             if (!g_state.cbfEnabled) {
-                g_state.resetInput();
+                g_state.reset();
             }
         });
         m_cbfToggle->toggle(g_state.cbfEnabled);
@@ -164,57 +168,64 @@ class $modify(CBFPlayLayer, PlayLayer) {
         if (!PlayLayer::init(level, useReplay, dontSave)) {
             return false;
         }
-        g_state.resetInput();
+        g_state.reset();
         return true;
     }
 
     void resetLevel() {
-        g_state.resetInput();
+        g_state.reset();
         PlayLayer::resetLevel();
-    }
-
-    void postUpdate(float dt) {
-        PlayLayer::postUpdate(dt);
-
-        if (!g_state.cbfEnabled || !m_player1) return;
-
-        if (g_state.remainingCbfTicks > 0) {
-            g_state.remainingCbfTicks--;
-            if (g_state.remainingCbfTicks == 0 && g_state.isBufferedHold) {
-                g_state.isBufferedHold = false;
-                if (!g_state.physicallyHeld) {
-                    m_player1->releaseButton(PlayerButton::Jump);
-                }
-            }
-        }
     }
 };
 
 class $modify(CBFPlayerObject, PlayerObject) {
     void pushButton(PlayerButton btn) {
-        PlayerObject::pushButton(btn);
-        if (g_state.cbfEnabled && btn == PlayerButton::Jump) {
-            g_state.physicallyHeld = true;
-            g_state.isBufferedHold = true;
-            g_state.remainingCbfTicks = g_state.bufferTicks;
-        }
-    }
-
-    void releaseButton(PlayerButton btn) {
-        if (g_state.cbfEnabled && btn == PlayerButton::Jump) {
-            g_state.physicallyHeld = false;
-            if (g_state.remainingCbfTicks > 0 && g_state.isBufferedHold) {
+        if (g_state.cbfEnabled && btn == PlayerButton::Jump && g_state.bufferTicks > 0) {
+            if (!canPlayerBufferJump(this)) {
+                g_state.awaitingBufferedJump = true;
+                g_state.bufferedTicksLeft = g_state.bufferTicks;
                 return;
             }
         }
-        PlayerObject::releaseButton(btn);
+        g_state.reset();
+        PlayerObject::pushButton(btn);
+    }
+
+    void releaseButton(PlayerButton btn) {
         if (btn == PlayerButton::Jump) {
-            g_state.isBufferedHold = false;
+            g_state.awaitingBufferedJump = false;
+            g_state.bufferedTicksLeft = 0;
+        }
+        PlayerObject::releaseButton(btn);
+    }
+
+    void update(float dt) {
+        PlayerObject::update(dt);
+
+        if (!g_state.cbfEnabled || !g_state.awaitingBufferedJump) return;
+        if (this->m_isDead) {
+            g_state.reset();
+            return;
+        }
+
+        if (g_state.bufferedTicksLeft > 0) {
+            if (canPlayerBufferJump(this)) {
+                g_state.awaitingBufferedJump = false;
+                g_state.bufferedTicksLeft = 0;
+                PlayerObject::pushButton(PlayerButton::Jump);
+            } else {
+                g_state.bufferedTicksLeft--;
+                if (g_state.bufferedTicksLeft <= 0) {
+                    g_state.awaitingBufferedJump = false;
+                }
+            }
+        } else {
+            g_state.awaitingBufferedJump = false;
         }
     }
 };
 
 $on_mod(Loaded) {
     g_state.cbfEnabled = Mod::get()->getSavedValue<bool>("cbf-enabled", true);
-    g_state.bufferTicks = static_cast<int>(Mod::get()->getSavedValue<int64_t>("cbf-ticks", 4));
+    g_state.bufferTicks = static_cast<int>(Mod::get()->getSavedValue<int64_t>("cbf-ticks", 10));
 };
